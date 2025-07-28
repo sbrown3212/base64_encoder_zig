@@ -1,6 +1,5 @@
 const std = @import("std");
-
-pub fn main() !void {}
+const stdout = std.io.getStdOut().writer();
 
 const Base64 = struct {
     _table: *const [64]u8,
@@ -25,7 +24,7 @@ const Base64 = struct {
         if (char == '=') {
             return 64;
         }
-        var index = 0;
+        var index: u8 = 0;
         for (0..63) |i| {
             if (self._char_at(i) == char)
                 break;
@@ -97,23 +96,23 @@ const Base64 = struct {
                 iout += 4;
                 count = 0;
             }
+        }
 
-            if (count == 1) {
-                out[iout] = self._char_at(buf[0] >> 2);
-                out[iout + 1] = self._char_at((buf[0] & 0x03) << 4);
-                out[iout + 2] = '=';
-                out[iout + 3] = '=';
-            }
+        if (count == 1) {
+            out[iout] = self._char_at(buf[0] >> 2);
+            out[iout + 1] = self._char_at((buf[0] & 0x03) << 4);
+            out[iout + 2] = '=';
+            out[iout + 3] = '=';
+        }
 
-            if (count == 2) {
-                out[iout] = self._char_at(buf[0] >> 2);
-                out[iout + 1] = self._char_at(((buf[0] & 0x03) << 4) + (buf[1] >> 4));
-                out[iout + 2] = self._char_at((buf[1] & 0x0f) << 2);
-                out[iout + 3] = '=';
-                // TODO: Figure out why when the count is only '2', the
-                // function moves onto the next output grouping of 4.
-                iout += 4;
-            }
+        if (count == 2) {
+            out[iout] = self._char_at(buf[0] >> 2);
+            out[iout + 1] = self._char_at(((buf[0] & 0x03) << 4) + (buf[1] >> 4));
+            out[iout + 2] = self._char_at((buf[1] & 0x0f) << 2);
+            out[iout + 3] = '=';
+            // TODO: Figure out why when the count is only '2', the
+            // function moves onto the next output grouping of 4.
+            iout += 4;
         }
 
         return out;
@@ -183,29 +182,20 @@ fn _calc_decode_length(input: []const u8) !usize {
     return multiple_groups;
 }
 
-// test "simple test" {
-//     var list = std.ArrayList(i32).init(std.testing.allocator);
-//     defer list.deinit(); // Try commenting this out and see if zig detects the memory leak!
-//     try list.append(42);
-//     try std.testing.expectEqual(@as(i32, 42), list.pop());
-// }
-//
-// test "use other module" {
-//     try std.testing.expectEqual(@as(i32, 150), lib.add(100, 50));
-// }
-//
-// test "fuzz example" {
-//     const Context = struct {
-//         fn testOne(context: @This(), input: []const u8) anyerror!void {
-//             _ = context;
-//             // Try passing `--fuzz` to `zig build test` and see if it manages to fail this test case!
-//             try std.testing.expect(!std.mem.eql(u8, "canyoufindme", input));
-//         }
-//     };
-//     try std.testing.fuzz(Context{}, Context.testOne, .{});
-// }
-//
-// const std = @import("std");
-//
-// /// This imports the separate module containing `root.zig`. Take a look in `build.zig` for details.
-// const lib = @import("base64_encoder_lib");
+pub fn main() !void {
+    var memory_buffer: [1000]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&memory_buffer);
+    const allocator = fba.allocator();
+
+    const text = "Testing some more stuff";
+    const etext = "VGVzdGluZyBzb21lIG1vcmUgc3R1ZmY=";
+
+    const base64 = Base64.init();
+    const encoded_text = try base64.encode(allocator, text);
+    const decoded_text = try base64.decode(allocator, etext);
+
+    try stdout.print("Encoded text: {s}\n", .{encoded_text});
+    try stdout.print("   Expecting: {s}\n\n", .{etext});
+    try stdout.print("Decoded text: {s}\n", .{decoded_text});
+    try stdout.print("   Expecting: {s}\n", .{text});
+}
